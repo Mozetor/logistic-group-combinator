@@ -1,42 +1,45 @@
-
 local function on_tick(event)
-  for _, comb in pairs(storage.logGroupComb or {}) do
-    if comb.valid then
-      control_behaviour = comb.get_control_behavior()
-      circuit_net_green = comb.get_circuit_network(defines.wire_connector_id.circuit_green)
+    for _, comb in pairs(storage.logGroupComb or {}) do
+        if comb.valid then
+            local control_behaviour = comb.get_control_behavior()
+            local circuit_net_green = comb.get_circuit_network(defines.wire_connector_id.circuit_green)
 
-      if control_behaviour ~= nil and control_behaviour.sections_count > 0 and circuit_net_green ~= nil then
-        section = control_behaviour.get_section(1)
-        if section.group ~= "" then
-          for i = 1, section.filters_count, 1 do
-            section.clear_slot(i)
-          end
-          current_signals = {}
-          current_index = 1
-          for _, signal in ipairs(circuit_net_green.signals or {}) do
-            if signal.signal.type == nil then
-              if current_signals[signal.signal.name] == nil then
-                local slot = {
-                  value = signal.signal.name,
-                  min=signal.count
-                }
-                section.set_slot(current_index, slot)
-                current_signals[signal.signal.name] = {index=current_index, count=signal.count}
-                current_index = current_index + 1
-              else
-                current_signals[signal.signal.name].count = current_signals[signal.signal.name].count + signal.count
-                local slot = {
-                  value = signal.signal.name,
-                  min= current_signals[signal.signal.name].count
-                }
-                section.set_slot(current_signals[signal.signal.name].index, slot)
-              end
+            if control_behaviour ~= nil and control_behaviour.sections_count > 0 and circuit_net_green ~= nil then
+                local section = control_behaviour.get_section(1)
+                if section.group ~= "" then
+                    local filters = {}
+                    local signal_index = {}
+
+                    for _, signal in ipairs(circuit_net_green.signals or {}) do
+                        if signal.signal.name then
+                            local signal_name = signal.signal.name
+                            local signal_type = signal.signal.type or "item"
+                            local signal_quality = signal.signal.quality or "normal"
+                            local key = signal_type .. "|" .. signal_name .. "|" .. signal_quality
+
+                            if signal_index[key] then
+                                local index = signal_index[key]
+                                filters[index].min = filters[index].min + signal.count
+                            else
+                                table.insert(filters, {
+                                    value = {
+                                        comparator = "=",
+                                        type = signal_type,
+                                        name = signal_name,
+                                        quality = signal_quality
+                                    },
+                                    min = signal.count
+                                })
+                                signal_index[key] = #filters
+                            end
+                        end
+                    end
+
+                    section.filters = filters
+                end
             end
-          end
         end
-      end
     end
-  end
 end
 
 local function on_entity_created(event)
